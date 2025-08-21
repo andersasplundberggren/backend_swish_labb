@@ -773,13 +773,23 @@
             
             const salesByDay = {};
             allPurchases.forEach(purchase => {
-                const date = new Date(purchase.created_at).toLocaleDateString('sv-SE');
+                const date = new Date(purchase.created_at).toISOString().split('T')[0];
                 salesByDay[date] = (salesByDay[date] || 0) + parseFloat(purchase.total_amount || 0);
             });
             
+            // Sortera datum kronologiskt (äldst först)
             const sortedDates = Object.keys(salesByDay).sort((a, b) => 
-                new Date(a.split('-').reverse().join('-')) - new Date(b.split('-').reverse().join('-'))
+                new Date(a) - new Date(b)
             );
+            
+            // Formatera datum för visning
+            const formattedLabels = sortedDates.map(date => {
+                const d = new Date(date);
+                return d.toLocaleDateString('sv-SE', { 
+                    month: 'short', 
+                    day: 'numeric' 
+                });
+            });
             
             if (salesChart) {
                 salesChart.destroy();
@@ -788,7 +798,7 @@
             salesChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: sortedDates,
+                    labels: formattedLabels,
                     datasets: [{
                         label: 'Försäljning (kr)',
                         data: sortedDates.map(date => salesByDay[date]),
@@ -816,6 +826,17 @@
                             padding: 12,
                             cornerRadius: 8,
                             callbacks: {
+                                title: function(context) {
+                                    // Visa fullständigt datum i tooltip
+                                    const index = context[0].dataIndex;
+                                    const fullDate = new Date(sortedDates[index]);
+                                    return fullDate.toLocaleDateString('sv-SE', {
+                                        weekday: 'long',
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                    });
+                                },
                                 label: function(context) {
                                     return `Försäljning: ${context.parsed.y.toFixed(0)} kr`;
                                 }
