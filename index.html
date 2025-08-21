@@ -1,6 +1,1148 @@
+<!DOCTYPE html>
+<html lang="sv">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BIK Karlskoga - Försäljningsstatistik</title> 
-  });
+    <title>BIK Karlskoga - Försäljningsstatistik</title>
+    
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Chart.js för grafer -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- SheetJS för Excel-export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        :root {
+            --primary: #1e3c72;
+            --primary-dark: #152a4f;
+            --secondary: #2a5298;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --dark: #1f2937;
+            --light: #f9fafb;
+            --border: #e5e7eb;
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 0;
+            margin: 0;
+        }
+        
+        /* Modern Header */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1.5rem 2rem;
+            box-shadow: var(--shadow-lg);
+            margin-bottom: 2rem;
+            border-bottom: 3px solid var(--primary);
+        }
+        
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .header .logo {
+            width: 40px;
+            height: 40px;
+        }
+        
+        .header-info {
+            text-align: right;
+        }
+        
+        .header-info .date-time {
+            font-size: 0.9rem;
+            color: var(--dark);
+            font-weight: 500;
+        }
+        
+        .header-info .status {
+            font-size: 0.8rem;
+            color: var(--success);
+            margin-top: 0.25rem;
+        }
+        
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 1rem 2rem;
+        }
+        
+        /* Modern Controls */
+        .controls {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            margin-bottom: 1.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .control-group label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--dark);
+            white-space: nowrap;
+        }
+        
+        .controls input, .controls select {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            background: white;
+            transition: all 0.2s;
+        }
+        
+        .controls input:focus, .controls select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(30, 60, 114, 0.1);
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .export-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-left: auto;
+        }
+        
+        /* Modern Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            border-left: 4px solid var(--primary);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, rgba(30, 60, 114, 0.1) 0%, rgba(30, 60, 114, 0.05) 100%);
+            border-radius: 50%;
+            transform: translate(20px, -20px);
+        }
+        
+        .stat-card .icon {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            font-size: 1.5rem;
+            opacity: 0.3;
+        }
+        
+        .stat-card h3 {
+            color: #6b7280;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-card .value {
+            color: var(--dark);
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            line-height: 1;
+        }
+        
+        .stat-card .change {
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+        
+        .stat-card .change.negative {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+        
+        .stat-card .change::before {
+            content: '↑';
+            font-weight: bold;
+        }
+        
+        .stat-card .change.negative::before {
+            content: '↓';
+        }
+        
+        /* Modern Chart Container */
+        .chart-container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            margin-bottom: 1.5rem;
+            transition: all 0.3s;
+        }
+        
+        .chart-container:hover {
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .chart-container h2 {
+            color: var(--dark);
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .chart-container h2::after {
+            content: '';
+            flex: 1;
+            height: 2px;
+            background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
+            margin-left: 1rem;
+        }
+        
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+        }
+        
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        
+        /* Modern Table */
+        .table-container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        
+        .table-container h2 {
+            color: var(--dark);
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .table-wrapper {
+            overflow-x: auto;
+            margin: -1.5rem;
+            padding: 1.5rem;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.875rem;
+        }
+        
+        thead {
+            background: var(--light);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        th {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--dark);
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+        
+        th:first-child {
+            border-top-left-radius: 8px;
+        }
+        
+        th:last-child {
+            border-top-right-radius: 8px;
+        }
+        
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: #4b5563;
+        }
+        
+        tbody tr {
+            transition: all 0.2s;
+        }
+        
+        tbody tr:hover {
+            background: rgba(30, 60, 114, 0.03);
+        }
+        
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        /* Loading and Error States */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        .loading::before {
+            content: '';
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #fef2f2;
+            color: #991b1b;
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--danger);
+            margin: 1rem 0;
+            font-size: 0.875rem;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+        
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 1rem;
+            opacity: 0.3;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .header-info {
+                text-align: center;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .control-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .export-buttons {
+                margin-left: 0;
+                flex-direction: column;
+            }
+            
+            .table-wrapper {
+                margin: -1rem;
+                padding: 1rem;
+            }
+        }
+        
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+            }
+            
+            .header {
+                background: white;
+                border-bottom: 2px solid black;
+                margin-bottom: 1rem;
+            }
+            
+            .controls {
+                display: none;
+            }
+            
+            .stat-card, .chart-container, .table-container {
+                box-shadow: none;
+                border: 1px solid #ddd;
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Modern Header -->
+    <div class="header">
+        <div class="header-content">
+            <h1>
+                <img src="https://sportality.cdn.s8y.se/team-logos/bik1_bik.svg" alt="BIK" class="logo">
+                BIK Karlskoga Försäljningsstatistik
+            </h1>
+            <div class="header-info">
+                <div class="date-time" id="currentDateTime">Laddar...</div>
+                <div class="status">● System Online</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <!-- Modern Controls -->
+        <div class="controls">
+            <div class="control-group">
+                <label>Period:</label>
+                <select id="periodSelect">
+                    <option value="today">Idag</option>
+                    <option value="yesterday">Igår</option>
+                    <option value="week" selected>Denna vecka</option>
+                    <option value="month">Denna månad</option>
+                    <option value="lastMonth">Förra månaden</option>
+                    <option value="custom">Anpassad</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Från:</label>
+                <input type="date" id="startDate">
+            </div>
+            
+            <div class="control-group">
+                <label>Till:</label>
+                <input type="date" id="endDate">
+            </div>
+            
+            <button class="btn btn-primary" onclick="loadStatistics()">
+                🔄 Uppdatera
+            </button>
+            
+            <div class="export-buttons">
+                <button class="btn btn-success" onclick="exportToExcel()">
+                    📊 Excel
+                </button>
+                <button class="btn btn-success" onclick="exportToCSV()">
+                    📄 CSV
+                </button>
+                <button class="btn btn-success" onclick="window.print()">
+                    🖨️ Skriv ut
+                </button>
+            </div>
+        </div>
+        
+        <!-- Modern Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="icon">💰</span>
+                <h3>Total försäljning</h3>
+                <div class="value" id="totalSales">0 kr</div>
+                <span class="change" id="salesChange">+0%</span>
+            </div>
+            
+            <div class="stat-card">
+                <span class="icon">🛒</span>
+                <h3>Antal transaktioner</h3>
+                <div class="value" id="totalTransactions">0</div>
+                <span class="change" id="transChange">+0%</span>
+            </div>
+            
+            <div class="stat-card">
+                <span class="icon">📊</span>
+                <h3>Snittköp</h3>
+                <div class="value" id="avgTransaction">0 kr</div>
+                <span class="change" id="avgChange">+0%</span>
+            </div>
+            
+            <div class="stat-card">
+                <span class="icon">🏆</span>
+                <h3>Mest sålda produkt</h3>
+                <div class="value" id="topProduct" style="font-size: 1.25rem;">-</div>
+                <span class="change" id="topProductCount" style="background: rgba(59, 130, 246, 0.1); color: var(--info);">0 st</span>
+            </div>
+        </div>
+        
+        <!-- Charts -->
+        <div class="chart-container">
+            <h2>📈 Försäljning över tid</h2>
+            <div class="chart-wrapper">
+                <canvas id="salesChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-grid">
+            <div class="chart-container">
+                <h2>🥧 Produktfördelning</h2>
+                <div class="chart-wrapper" style="height: 300px;">
+                    <canvas id="productChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h2>📊 Topp 10 produkter</h2>
+                <div class="chart-wrapper" style="height: 300px;">
+                    <canvas id="topProductsChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modern Table -->
+        <div class="table-container">
+            <h2>📋 Transaktionsdetaljer</h2>
+            <div class="table-wrapper">
+                <div id="tableContent">
+                    <div class="loading">Laddar transaktioner...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ========================================
+        // SUPABASE KONFIGURATION
+        // ========================================
+        const SUPABASE_URL = 'https://notuhncgibrtlkktopnz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vdHVobmNnaWJydGxra3RvcG56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2Nzc1NzYsImV4cCI6MjA3MTI1MzU3Nn0.d5UxBzsxgnXEkQdKMb-m1vvVcOdqLp5HoTM1Joatc3w';
+        
+        // Initiera Supabase
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // ========================================
+        // GLOBALA VARIABLER
+        // ========================================
+        let allPurchases = [];
+        let salesChart = null;
+        let productChart = null;
+        let topProductsChart = null;
+        
+        // ========================================
+        // DATUM OCH TID
+        // ========================================
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('currentDateTime').textContent = 
+                now.toLocaleString('sv-SE', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+        }
+        
+        function setDateRange(period) {
+            const today = new Date();
+            const startDate = document.getElementById('startDate');
+            const endDate = document.getElementById('endDate');
+            
+            switch(period) {
+                case 'today':
+                    startDate.value = today.toISOString().split('T')[0];
+                    endDate.value = today.toISOString().split('T')[0];
+                    break;
+                case 'yesterday':
+                    const yesterday = new Date(today);
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    startDate.value = yesterday.toISOString().split('T')[0];
+                    endDate.value = yesterday.toISOString().split('T')[0];
+                    break;
+                case 'week':
+                    const weekStart = new Date(today);
+                    weekStart.setDate(today.getDate() - today.getDay() + 1);
+                    startDate.value = weekStart.toISOString().split('T')[0];
+                    endDate.value = today.toISOString().split('T')[0];
+                    break;
+                case 'month':
+                    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                    startDate.value = monthStart.toISOString().split('T')[0];
+                    endDate.value = today.toISOString().split('T')[0];
+                    break;
+                case 'lastMonth':
+                    const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                    const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+                    startDate.value = lastMonthStart.toISOString().split('T')[0];
+                    endDate.value = lastMonthEnd.toISOString().split('T')[0];
+                    break;
+            }
+        }
+        
+        // ========================================
+        // LADDA DATA FRÅN SUPABASE
+        // ========================================
+        async function loadStatistics() {
+            try {
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                
+                if (!startDate || !endDate) {
+                    alert('Välj både start- och slutdatum');
+                    return;
+                }
+                
+                document.getElementById('tableContent').innerHTML = '<div class="loading">Laddar transaktioner...</div>';
+                
+                let query = supabaseClient
+                    .from('purchases')
+                    .select('*')
+                    .gte('created_at', startDate + 'T00:00:00')
+                    .lte('created_at', endDate + 'T23:59:59')
+                    .order('created_at', { ascending: false });
+                
+                const { data, error } = await query;
+                
+                if (error) throw error;
+                
+                allPurchases = data || [];
+                
+                updateOverviewCards();
+                updateSalesChart();
+                updateProductCharts();
+                updateTransactionTable();
+                
+            } catch (error) {
+                console.error('Fel vid laddning av statistik:', error);
+                document.getElementById('tableContent').innerHTML = 
+                    `<div class="error">Kunde inte ladda statistik: ${error.message}</div>`;
+            }
+        }
+        
+        // ========================================
+        // UPPDATERA ÖVERSIKTSKORT
+        // ========================================
+        function updateOverviewCards() {
+            const totalSales = allPurchases.reduce((sum, p) => sum + parseFloat(p.total_amount || 0), 0);
+            const totalTransactions = allPurchases.length;
+            const avgTransaction = totalTransactions > 0 ? totalSales / totalTransactions : 0;
+            
+            const productCounts = {};
+            allPurchases.forEach(purchase => {
+                if (purchase.items && Array.isArray(purchase.items)) {
+                    purchase.items.forEach(item => {
+                        productCounts[item.name] = (productCounts[item.name] || 0) + (item.quantity || 1);
+                    });
+                }
+            });
+            
+            const topProduct = Object.entries(productCounts)
+                .sort((a, b) => b[1] - a[1])[0];
+            
+            document.getElementById('totalSales').textContent = `${totalSales.toFixed(0)} kr`;
+            document.getElementById('totalTransactions').textContent = totalTransactions;
+            document.getElementById('avgTransaction').textContent = `${avgTransaction.toFixed(0)} kr`;
+            
+            if (topProduct) {
+                document.getElementById('topProduct').textContent = topProduct[0];
+                document.getElementById('topProductCount').textContent = `${topProduct[1]} st`;
+            }
+        }
+        
+        // ========================================
+        // UPPDATERA GRAFER
+        // ========================================
+        function updateSalesChart() {
+            const ctx = document.getElementById('salesChart').getContext('2d');
+            
+            const salesByDay = {};
+            allPurchases.forEach(purchase => {
+                const date = new Date(purchase.created_at).toLocaleDateString('sv-SE');
+                salesByDay[date] = (salesByDay[date] || 0) + parseFloat(purchase.total_amount || 0);
+            });
+            
+            const sortedDates = Object.keys(salesByDay).sort((a, b) => 
+                new Date(a.split('-').reverse().join('-')) - new Date(b.split('-').reverse().join('-'))
+            );
+            
+            if (salesChart) {
+                salesChart.destroy();
+            }
+            
+            salesChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: sortedDates,
+                    datasets: [{
+                        label: 'Försäljning (kr)',
+                        data: sortedDates.map(date => salesByDay[date]),
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#667eea',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    return `Försäljning: ${context.parsed.y.toFixed(0)} kr`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + ' kr';
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateProductCharts() {
+            const productSales = {};
+            allPurchases.forEach(purchase => {
+                if (purchase.items && Array.isArray(purchase.items)) {
+                    purchase.items.forEach(item => {
+                        if (!productSales[item.name]) {
+                            productSales[item.name] = {
+                                quantity: 0,
+                                revenue: 0
+                            };
+                        }
+                        productSales[item.name].quantity += (item.quantity || 1);
+                        productSales[item.name].revenue += parseFloat(item.price || 0) * (item.quantity || 1);
+                    });
+                }
+            });
+            
+            const sortedProducts = Object.entries(productSales)
+                .sort((a, b) => b[1].revenue - a[1].revenue);
+            
+            // PIE CHART
+            const pieCtx = document.getElementById('productChart').getContext('2d');
+            if (productChart) {
+                productChart.destroy();
+            }
+            
+            const topProducts = sortedProducts.slice(0, 6);
+            const otherRevenue = sortedProducts.slice(6).reduce((sum, [_, data]) => sum + data.revenue, 0);
+            
+            productChart = new Chart(pieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [...topProducts.map(([name]) => name), otherRevenue > 0 ? 'Övrigt' : null].filter(Boolean),
+                    datasets: [{
+                        data: [...topProducts.map(([_, data]) => data.revenue), otherRevenue].filter(v => v > 0),
+                        backgroundColor: [
+                            '#667eea',
+                            '#8b5cf6',
+                            '#ec4899',
+                            '#f43f5e',
+                            '#f97316',
+                            '#facc15',
+                            '#a3a3a3'
+                        ],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${label}: ${value.toFixed(0)} kr (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // BAR CHART
+            const barCtx = document.getElementById('topProductsChart').getContext('2d');
+            if (topProductsChart) {
+                topProductsChart.destroy();
+            }
+            
+            const top10 = sortedProducts.slice(0, 10);
+            
+            topProductsChart = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: top10.map(([name]) => name),
+                    datasets: [{
+                        label: 'Antal sålda',
+                        data: top10.map(([_, data]) => data.quantity),
+                        backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                        borderRadius: 6,
+                        hoverBackgroundColor: 'rgba(102, 126, 234, 1)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                stepSize: 1
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // ========================================
+        // UPPDATERA TRANSAKTIONSTABELL
+        // ========================================
+        function updateTransactionTable() {
+            if (allPurchases.length === 0) {
+                document.getElementById('tableContent').innerHTML = 
+                    `<div class="empty-state">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                        </svg>
+                        <p>Inga transaktioner för vald period</p>
+                    </div>`;
+                return;
+            }
+            
+            let tableHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tid</th>
+                            <th>Kvitto-ID</th>
+                            <th>Produkter</th>
+                            <th>Belopp ex. moms</th>
+                            <th>Moms</th>
+                            <th>Totalt</th>
+                            <th>Kassör</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            allPurchases.forEach(purchase => {
+                const date = new Date(purchase.created_at);
+                const products = purchase.items ? 
+                    purchase.items.map(item => `${item.name} (${item.quantity || 1})`).join(', ') : '-';
+                
+                tableHTML += `
+                    <tr>
+                        <td>${date.toLocaleString('sv-SE')}</td>
+                        <td><span style="font-family: monospace; font-size: 0.8rem;">${purchase.id}</span></td>
+                        <td>${products}</td>
+                        <td>${(purchase.amount || 0).toFixed(2)} kr</td>
+                        <td>${(purchase.vat_amount || 0).toFixed(2)} kr</td>
+                        <td><strong>${(purchase.total_amount || 0).toFixed(2)} kr</strong></td>
+                        <td>${purchase.cashier_name || '-'}</td>
+                    </tr>
+                `;
+            });
+            
+            tableHTML += '</tbody></table>';
+            document.getElementById('tableContent').innerHTML = tableHTML;
+        }
+        
+        // ========================================
+        // EXPORT FUNKTIONER
+        // ========================================
+        function exportToExcel() {
+            if (allPurchases.length === 0) {
+                alert('Ingen data att exportera');
+                return;
+            }
+            
+            const excelData = allPurchases.map(purchase => {
+                const products = purchase.items ? 
+                    purchase.items.map(item => `${item.name} (${item.quantity || 1})`).join(', ') : '';
+                
+                return {
+                    'Datum': new Date(purchase.created_at).toLocaleString('sv-SE'),
+                    'Kvitto-ID': purchase.id,
+                    'Produkter': products,
+                    'Belopp ex. moms': purchase.amount || 0,
+                    'Moms': purchase.vat_amount || 0,
+                    'Totalt': purchase.total_amount || 0,
+                    'Kassör': purchase.cashier_name || '',
+                    'Status': purchase.status || ''
+                };
+            });
+            
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Försäljning');
+            
+            const summaryData = [
+                ['Sammanfattning'],
+                ['Period', `${document.getElementById('startDate').value} till ${document.getElementById('endDate').value}`],
+                ['Total försäljning', allPurchases.reduce((sum, p) => sum + (p.total_amount || 0), 0)],
+                ['Antal transaktioner', allPurchases.length],
+                ['Snittköp', allPurchases.length > 0 ? 
+                    allPurchases.reduce((sum, p) => sum + (p.total_amount || 0), 0) / allPurchases.length : 0]
+            ];
+            
+            const ws2 = XLSX.utils.aoa_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(wb, ws2, 'Sammanfattning');
+            
+            const fileName = `BIK_Forsaljning_${document.getElementById('startDate').value}_${document.getElementById('endDate').value}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+        }
+        
+        function exportToCSV() {
+            if (allPurchases.length === 0) {
+                alert('Ingen data att exportera');
+                return;
+            }
+            
+            let csvContent = 'Datum,Kvitto-ID,Produkter,Belopp ex. moms,Moms,Totalt,Kassör,Status\n';
+            
+            allPurchases.forEach(purchase => {
+                const products = purchase.items ? 
+                    purchase.items.map(item => `${item.name} (${item.quantity || 1})`).join('; ') : '';
+                
+                csvContent += `"${new Date(purchase.created_at).toLocaleString('sv-SE')}",`;
+                csvContent += `"${purchase.id}",`;
+                csvContent += `"${products}",`;
+                csvContent += `${purchase.amount || 0},`;
+                csvContent += `${purchase.vat_amount || 0},`;
+                csvContent += `${purchase.total_amount || 0},`;
+                csvContent += `"${purchase.cashier_name || ''}",`;
+                csvContent += `"${purchase.status || ''}"\n`;
+            });
+            
+            const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `BIK_Forsaljning_${document.getElementById('startDate').value}_${document.getElementById('endDate').value}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // ========================================
+        // INIT
+        // ========================================
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDateTime();
+            setInterval(updateDateTime, 60000);
+            
+            setDateRange('week');
+            
+            document.getElementById('periodSelect').addEventListener('change', function(e) {
+                if (e.target.value !== 'custom') {
+                    setDateRange(e.target.value);
+                    loadStatistics();
+                }
+            });
+            
+            loadStatistics();
+            
+            // Auto-uppdatering var 30:e sekund
+            setInterval(loadStatistics, 30000);
+        });
+        
+        // ========================================
+        // PRINT STYLING
+        // ========================================
+        window.addEventListener('beforeprint', function() {
+            document.querySelectorAll('.chart-wrapper').forEach(wrapper => {
+                wrapper.style.height = 'auto';
+            });
+        });
+        
+        window.addEventListener('afterprint', function() {
+            document.querySelectorAll('.chart-wrapper').forEach(wrapper => {
+                wrapper.style.height = '';
+            });
+        });
     </script>
+</body>
+</html>
