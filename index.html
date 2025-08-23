@@ -179,6 +179,17 @@
             box-shadow: var(--shadow-lg);
         }
         
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-lg);
+        }
+        
         .export-buttons {
             display: flex;
             gap: 0.5rem;
@@ -313,6 +324,76 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1.5rem;
+        }
+        
+        /* Table Filters */
+        .table-filters {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            margin-bottom: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .filter-group label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--dark);
+            white-space: nowrap;
+        }
+        
+        .filter-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-left: auto;
+        }
+        
+        .filter-badge {
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .filter-badge button {
+            background: rgba(255, 255, 255, 0.3);
+            border: none;
+            color: white;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            line-height: 1;
+        }
+        
+        .filter-badge button:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+        
+        .active-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
         }
         
         /* Modern Table */
@@ -472,6 +553,21 @@
                 flex-direction: column;
             }
             
+            .table-filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-actions {
+                margin-left: 0;
+                flex-direction: column;
+            }
+            
             .table-wrapper {
                 margin: -1rem;
                 padding: 1rem;
@@ -490,7 +586,7 @@
                 margin-bottom: 1rem;
             }
             
-            .controls {
+            .controls, .table-filters {
                 display: none;
             }
             
@@ -614,6 +710,53 @@
             </div>
         </div>
         
+        <!-- Table Filters -->
+        <div class="table-filters">
+            <div class="filter-group">
+                <label>Sök:</label>
+                <input type="text" id="searchFilter" placeholder="Sök i alla fält...">
+            </div>
+            
+            <div class="filter-group">
+                <label>Kassör:</label>
+                <select id="cashierFilter">
+                    <option value="">Alla kassörer</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Belopp från:</label>
+                <input type="number" id="minAmountFilter" placeholder="0" min="0" step="0.01">
+            </div>
+            
+            <div class="filter-group">
+                <label>till:</label>
+                <input type="number" id="maxAmountFilter" placeholder="9999" min="0" step="0.01">
+            </div>
+            
+            <div class="filter-group">
+                <label>Produkt:</label>
+                <input type="text" id="productFilter" placeholder="Produktnamn...">
+            </div>
+            
+            <div class="filter-actions">
+                <button class="btn btn-primary" onclick="applyTableFilters()">
+                    🔍 Filtrera
+                </button>
+                <button class="btn btn-danger" onclick="clearTableFilters()">
+                    ✖️ Rensa
+                </button>
+            </div>
+        </div>
+        
+        <!-- Active Filters Display -->
+        <div id="activeFiltersContainer" class="table-filters" style="display: none;">
+            <strong>Aktiva filter:</strong>
+            <div class="active-filters" id="activeFilters">
+                <!-- Filter badges will be inserted here -->
+            </div>
+        </div>
+        
         <!-- Modern Table -->
         <div class="table-container">
             <h2>📋 Transaktionsdetaljer</h2>
@@ -640,9 +783,11 @@
         // GLOBALA VARIABLER
         // ========================================
         let allPurchases = [];
+        let filteredPurchases = [];
         let salesChart = null;
         let productChart = null;
         let topProductsChart = null;
+        let activeFilters = {};
         
         // ========================================
         // DATUM OCH TID
@@ -697,6 +842,170 @@
         }
         
         // ========================================
+        // FILTER FUNKTIONER
+        // ========================================
+        function applyTableFilters() {
+            const search = document.getElementById('searchFilter').value.toLowerCase();
+            const cashier = document.getElementById('cashierFilter').value;
+            const minAmount = parseFloat(document.getElementById('minAmountFilter').value) || 0;
+            const maxAmount = parseFloat(document.getElementById('maxAmountFilter').value) || Infinity;
+            const product = document.getElementById('productFilter').value.toLowerCase();
+            
+            activeFilters = {};
+            
+            if (search) activeFilters.search = search;
+            if (cashier) activeFilters.cashier = cashier;
+            if (minAmount > 0) activeFilters.minAmount = minAmount;
+            if (maxAmount < Infinity) activeFilters.maxAmount = maxAmount;
+            if (product) activeFilters.product = product;
+            
+            filteredPurchases = allPurchases.filter(purchase => {
+                // Sök i alla fält
+                if (activeFilters.search) {
+                    const searchableText = [
+                        purchase.id,
+                        purchase.cashier_name || '',
+                        purchase.items ? purchase.items.map(item => item.name).join(' ') : '',
+                        purchase.total_amount?.toString() || '',
+                        new Date(purchase.created_at).toLocaleString('sv-SE')
+                    ].join(' ').toLowerCase();
+                    
+                    if (!searchableText.includes(activeFilters.search)) return false;
+                }
+                
+                // Filtrera kassör
+                if (activeFilters.cashier && purchase.cashier_name !== activeFilters.cashier) {
+                    return false;
+                }
+                
+                // Filtrera belopp
+                const amount = parseFloat(purchase.total_amount) || 0;
+                if (amount < activeFilters.minAmount || amount > activeFilters.maxAmount) {
+                    return false;
+                }
+                
+                // Filtrera produkt
+                if (activeFilters.product) {
+                    const hasProduct = purchase.items && purchase.items.some(item => 
+                        item.name.toLowerCase().includes(activeFilters.product)
+                    );
+                    if (!hasProduct) return false;
+                }
+                
+                return true;
+            });
+            
+            updateActiveFiltersDisplay();
+            updateTransactionTable();
+        }
+        
+        function clearTableFilters() {
+            document.getElementById('searchFilter').value = '';
+            document.getElementById('cashierFilter').value = '';
+            document.getElementById('minAmountFilter').value = '';
+            document.getElementById('maxAmountFilter').value = '';
+            document.getElementById('productFilter').value = '';
+            
+            activeFilters = {};
+            filteredPurchases = [...allPurchases];
+            
+            updateActiveFiltersDisplay();
+            updateTransactionTable();
+        }
+        
+        function updateActiveFiltersDisplay() {
+            const container = document.getElementById('activeFiltersContainer');
+            const filtersDiv = document.getElementById('activeFilters');
+            
+            if (Object.keys(activeFilters).length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            container.style.display = 'flex';
+            filtersDiv.innerHTML = '';
+            
+            Object.entries(activeFilters).forEach(([key, value]) => {
+                let label = '';
+                let displayValue = value;
+                
+                switch(key) {
+                    case 'search':
+                        label = 'Sök';
+                        break;
+                    case 'cashier':
+                        label = 'Kassör';
+                        break;
+                    case 'minAmount':
+                        label = 'Min belopp';
+                        displayValue = `${value} kr`;
+                        break;
+                    case 'maxAmount':
+                        label = 'Max belopp';
+                        displayValue = `${value} kr`;
+                        break;
+                    case 'product':
+                        label = 'Produkt';
+                        break;
+                }
+                
+                const badge = document.createElement('div');
+                badge.className = 'filter-badge';
+                badge.innerHTML = `
+                    ${label}: ${displayValue}
+                    <button onclick="removeFilter('${key}')" title="Ta bort filter">✕</button>
+                `;
+                filtersDiv.appendChild(badge);
+            });
+        }
+        
+        function removeFilter(filterKey) {
+            delete activeFilters[filterKey];
+            
+            // Rensa motsvarande input
+            switch(filterKey) {
+                case 'search':
+                    document.getElementById('searchFilter').value = '';
+                    break;
+                case 'cashier':
+                    document.getElementById('cashierFilter').value = '';
+                    break;
+                case 'minAmount':
+                    document.getElementById('minAmountFilter').value = '';
+                    break;
+                case 'maxAmount':
+                    document.getElementById('maxAmountFilter').value = '';
+                    break;
+                case 'product':
+                    document.getElementById('productFilter').value = '';
+                    break;
+            }
+            
+            applyTableFilters();
+        }
+        
+        function populateCashierFilter() {
+            const cashiers = [...new Set(allPurchases
+                .map(p => p.cashier_name)
+                .filter(name => name && name.trim())
+            )].sort();
+            
+            const select = document.getElementById('cashierFilter');
+            const currentValue = select.value;
+            
+            select.innerHTML = '<option value="">Alla kassörer</option>';
+            cashiers.forEach(cashier => {
+                const option = document.createElement('option');
+                option.value = cashier;
+                option.textContent = cashier;
+                if (cashier === currentValue) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+        }
+        
+        // ========================================
         // LADDA DATA FRÅN SUPABASE
         // ========================================
         async function loadStatistics() {
@@ -723,7 +1032,9 @@
                 if (error) throw error;
                 
                 allPurchases = data || [];
+                filteredPurchases = [...allPurchases];
                 
+                populateCashierFilter();
                 updateOverviewCards();
                 updateSalesChart();
                 updateProductCharts();
@@ -1002,13 +1313,17 @@
         // UPPDATERA TRANSAKTIONSTABELL
         // ========================================
         function updateTransactionTable() {
-            if (allPurchases.length === 0) {
+            if (filteredPurchases.length === 0) {
+                const message = Object.keys(activeFilters).length > 0 
+                    ? 'Inga transaktioner matchar de valda filtren'
+                    : 'Inga transaktioner för vald period';
+                    
                 document.getElementById('tableContent').innerHTML = 
                     `<div class="empty-state">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                         </svg>
-                        <p>Inga transaktioner för vald period</p>
+                        <p>${message}</p>
                     </div>`;
                 return;
             }
@@ -1029,7 +1344,7 @@
                     <tbody>
             `;
             
-            allPurchases.forEach(purchase => {
+            filteredPurchases.forEach(purchase => {
                 const date = new Date(purchase.created_at);
                 const products = purchase.items ? 
                     purchase.items.map(item => `${item.name} (${item.quantity || 1})`).join(', ') : '-';
@@ -1055,12 +1370,14 @@
         // EXPORT FUNKTIONER
         // ========================================
         function exportToExcel() {
-            if (allPurchases.length === 0) {
+            const dataToExport = filteredPurchases.length > 0 ? filteredPurchases : allPurchases;
+            
+            if (dataToExport.length === 0) {
                 alert('Ingen data att exportera');
                 return;
             }
             
-            const excelData = allPurchases.map(purchase => {
+            const excelData = dataToExport.map(purchase => {
                 const products = purchase.items ? 
                     purchase.items.map(item => `${item.name} (${item.quantity || 1})`).join(', ') : '';
                 
@@ -1086,7 +1403,8 @@
                 ['Total försäljning', allPurchases.reduce((sum, p) => sum + (p.total_amount || 0), 0)],
                 ['Antal transaktioner', allPurchases.length],
                 ['Snittköp', allPurchases.length > 0 ? 
-                    allPurchases.reduce((sum, p) => sum + (p.total_amount || 0), 0) / allPurchases.length : 0]
+                    allPurchases.reduce((sum, p) => sum + (p.total_amount || 0), 0) / allPurchases.length : 0],
+                ['Filtrerade transaktioner', dataToExport.length]
             ];
             
             const ws2 = XLSX.utils.aoa_to_sheet(summaryData);
@@ -1097,14 +1415,16 @@
         }
         
         function exportToCSV() {
-            if (allPurchases.length === 0) {
+            const dataToExport = filteredPurchases.length > 0 ? filteredPurchases : allPurchases;
+            
+            if (dataToExport.length === 0) {
                 alert('Ingen data att exportera');
                 return;
             }
             
             let csvContent = 'Datum,Kvitto-ID,Produkter,Belopp ex. moms,Moms,Totalt,Kassör,Status\n';
             
-            allPurchases.forEach(purchase => {
+            dataToExport.forEach(purchase => {
                 const products = purchase.items ? 
                     purchase.items.map(item => `${item.name} (${item.quantity || 1})`).join('; ') : '';
                 
@@ -1130,6 +1450,25 @@
         }
         
         // ========================================
+        // EVENT LISTENERS
+        // ========================================
+        function setupFilterEventListeners() {
+            // Enter-tangent för att aktivera filter
+            ['searchFilter', 'minAmountFilter', 'maxAmountFilter', 'productFilter'].forEach(id => {
+                document.getElementById(id).addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        applyTableFilters();
+                    }
+                });
+            });
+            
+            // Auto-filtrera när kassör ändras
+            document.getElementById('cashierFilter').addEventListener('change', function() {
+                applyTableFilters();
+            });
+        }
+        
+        // ========================================
         // INIT
         // ========================================
         document.addEventListener('DOMContentLoaded', function() {
@@ -1145,6 +1484,7 @@
                 }
             });
             
+            setupFilterEventListeners();
             loadStatistics();
             
             // Auto-uppdatering var 30:e sekund
